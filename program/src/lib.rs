@@ -27,15 +27,19 @@ pub fn process_instruction(
         return Err(ProgramError::InvalidInstructionData);
     }
     
+    const DONATE_FLAG: u8 = 1;
+    const WITHDRAW_FLAG: u8 = 2;
+
     let flag = instruction_data[0];
-    if flag == 1 {
+
+    if flag == DONATE_FLAG {
         return donate(
             program_id,
             accounts,
             &instruction_data[1..instruction_data.len()],
         );
     }
-   else if flag == 2 {
+   else if flag == WITHDRAW_FLAG {
         return withdraw(
             program_id,
             accounts,
@@ -97,8 +101,9 @@ fn withdraw(
     let accounts_iter = &mut accounts.iter();
     let user_account = next_account_info(accounts_iter)?;
     let donator_program_account = next_account_info(accounts_iter)?;
-    
-    let owner_pubkey = Pubkey::from_str("3mzC56NqGSrZZSTRkY2ya4zNcYkZjY6Pg2F47qrJ9ECd").unwrap();
+   
+    let owner_key = "3mzC56NqGSrZZSTRkY2ya4zNcYkZjY6Pg2F47qrJ9ECd";
+    let owner_pubkey = Pubkey::from_str(owner_key).unwrap();
 
     if user_account.key != &owner_pubkey {
         return Err(ProgramError::IncorrectProgramId);
