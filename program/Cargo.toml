@@ -10,6 +10,7 @@ solana-program="1.9.17"
 borsh = "0.9.3"
 borsh-derive = "0.9.3"
 spl-token = "3.3.0"
+thiserror = "1.0.0"
 
 [features]
 no-entrypoint = []

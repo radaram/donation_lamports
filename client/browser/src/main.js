@@ -5,15 +5,16 @@ import {
     Transaction,
     PublicKey,
     TransactionInstruction,
-    Keypair
+    Keypair,
+    sendAndConfirmTransaction
 } from "@solana/web3.js";
 import { deserialize, serialize } from "borsh";
 
-const cluster = "https://api.devnet.solana.com";
-//const cluster = "http://localhost:8899";
+//const cluster = "https://api.devnet.solana.com";
+const cluster = "http://localhost:8899";
 const connection = new Connection(cluster, "confirmed");
 const programId = new PublicKey(
-    "9nhEXCXcd5BdYyqya5ovZhMrLWbRTXa8de9EnmFUPEcv"
+    "A7tb6TTYrjaSxYmL2PaETaFkEHq8jDAyGyJWLjdPTkyoal"
 );
 const wallet = new Wallet("https://www.sollet.io", cluster);
 
@@ -29,7 +30,7 @@ export async function onDonate() {
         alert("amount is not valid");
         return
     }
-   if (!wallet.connected) {
+    if (!wallet.connected) {
         await wallet.connect()
     }
  
@@ -78,74 +79,125 @@ class DonateDetails {
             fields: [
                 ["user", [32]],
                 ["amount", "u64"],
+                ["timestamp", "u64"],
             ]
         }]]);
 
 }
 
 
-async function prepareTransaction(userPubKey, amount) { 
-  const SEED = "crypton" + Math.random().toString();
-  let donatorPublicKey = await PublicKey.createWithSeed(
-        wallet.publicKey,
-        SEED,
-        programId
-  );
-    
-  let donateDetails = new DonateDetails({
-      user: wallet.publicKey.toBuffer(),
-      amount: amount, 
-  });
-  let data = serialize(DonateDetails.schema, donateDetails);
-  let data_to_send = new Uint8Array([1, ...data]);
- 
-  const lamports = (await connection.getMinimumBalanceForRentExemption(data.length));
-
-  const donatorProgramAccount = SystemProgram.createAccountWithSeed({
-        fromPubkey: wallet.publicKey,
-        basePubkey: wallet.publicKey,
-        seed: SEED,
-        newAccountPubkey: donatorPublicKey,
-        lamports: lamports,
-        space: data.length,
-        programId: programId,
-  });
-
-  const instruction = new TransactionInstruction({
-    keys: [
-      { pubkey: userPubKey, isSigner: true, isWritable: true },
-      { pubkey: donatorPublicKey, isSigner: false, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
-    programId: programId,
-    data: data_to_send,
-  })
-
-  console.log("donate details", donateDetails)
-  
-  let tx = new Transaction()
-  tx.add(donatorProgramAccount)
-  tx.add(instruction)
-
-  tx.feePayer = userPubKey
-  tx.recentBlockhash = (await connection.getRecentBlockhash()).blockhash
-
-  return tx
+class WithdrawData {
+   constructor(properties) {
+        Object.keys(properties).forEach((key) => {
+            this[key] = properties[key];
+        });
+    }
+    static schema = new Map([[WithdrawData,
+        {
+            kind: "struct",
+            fields: [
+                ["timestamp", "u64"],
+            ]
+        }]]); 
 }
 
 
 async function donate(userPubKey, amount) {
-  console.log("donate called")
-  const tx = await prepareTransaction(userPubKey, amount)
-  let signed = await wallet.signTransaction(tx)
-  await broadcastSignedTransaction(signed)
+    console.log("donate called")     
+    let timestamp = (Math.floor(Date.now() / 1000)).toString()
+    let donateDetails = new DonateDetails({
+        user: wallet.publicKey.toBuffer(),
+        amount: amount, 
+        timestamp: timestamp,
+    });
+    console.log(donateDetails);
+    let data = serialize(DonateDetails.schema, donateDetails);
+    let dataToSend = new Uint8Array([1, ...data]);
+
+    let [pda, bump] = await PublicKey.findProgramAddress(
+        [
+            wallet.publicKey.toBuffer(), 
+            timestamp
+        ],
+        programId
+    );
+
+    const ix = new TransactionInstruction({
+        keys: [
+          {
+            isSigner: true,
+            isWritable: true,
+            pubkey: wallet.publicKey,
+          },
+          {
+            isSigner: false,
+            isWritable: true,
+            pubkey: pda,
+          },
+          {
+            isSigner: false,
+            isWritable: false,
+            pubkey: SystemProgram.programId,
+          },
+        ],
+        programId: programId,
+        data: Buffer.from(dataToSend),
+    });
+
+    const tx = new Transaction();
+    tx.add(ix);
+    tx.feePayer = userPubKey;
+    tx.recentBlockhash = (await connection.getRecentBlockhash()).blockhash
+ 
+    console.log("start transaction")
+    //
+    let signed = await wallet.signTransaction(tx);
+    await broadcastSignedTransaction(signed);
 }
 
+
+async function withdraw() {
+  console.log("withdraw called")
+
+  let donations = await getAllDonations()
+         
+  let transaction = new Transaction()
+  donations.forEach((item) => {
+      console.log(item)
+      console.log(programId)
+      let withdrawData = new WithdrawData({
+          timestamp: item.timestamp
+      });
+      let data = serialize(WithdrawData.schema, withdrawData);
+      let dataToSend = new Uint8Array([2, ...data]);
+
+      let instruction_data = []
+      instruction_data.push({ pubkey: wallet.publicKey, isSigner: true, isWritable: true  })  
+      instruction_data.push({ pubkey: item.pdaPubKey, isSigner: false, isWritable: true })
+      instruction_data.push({ pubkey: item.userPubKey, isSigner: false, isWritable: false })
+      instruction_data.push({isSigner: false, isWritable: false, pubkey: SystemProgram.programId})
+      console.log("withdraw. Instuction data: ", instruction_data)
+      let instruction = new TransactionInstruction({
+            keys: instruction_data,
+            programId: programId,
+            data: Buffer.from(dataToSend),
+      });
+      transaction.add(instruction)
+  });
+ 
+  transaction.feePayer = wallet.publicKey;
+  transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+
+  let signed = await wallet.signTransaction(transaction);
+  await broadcastSignedTransaction(signed);
+}
+
+
 async function broadcastSignedTransaction(signed) {
-  let signature = await connection.sendRawTransaction(signed.serialize())
-  console.log("Submitted transaction " + signature + ", awaiting confirmation")
-  await connection.confirmTransaction(signature)
-  console.log("Transaction " + signature + " confirmed")
+  let signature = await connection.sendRawTransaction(signed.serialize());
+  console.log("Submitted transaction " + signature + ", awaiting confirmation");
+  await connection.confirmTransaction(signature);
+  console.log("Transaction " + signature + " confirmed");
 }
 
 
@@ -158,42 +210,16 @@ async function getAllDonations() {
             donate_details = deserialize(DonateDetails.schema, DonateDetails, item.account.data);
             console.log(donate_details)
             result.push({
-                programPubKey: item.pubkey,
+                pdaPubKey: item.pubkey,
                 userPubKey: new PublicKey(donate_details.user),
-                amount: donate_details.amount.toNumber()
+                amount: donate_details.amount.toNumber(),
+                timestamp: donate_details.timestamp,
             });
         } catch (err) {
             console.log(err);
         }
     });
-    console.log(result)
+    console.log(result);
     return result;
-}
-
-
-async function withdraw() {
-  console.log("withdraw called")
-
-  let donations = await getAllDonations()
-         
-  let transaction = new Transaction()
-  donations.forEach((item) => {
-      let instruction_data = []
-      instruction_data.push({ pubkey: wallet.publicKey, isSigner: true })  
-      instruction_data.push({ pubkey: item.programPubKey, isSigner: false, isWritable: true })
-      console.log("withdraw. Instuction data: ", instruction_data)
-      let instruction = new TransactionInstruction({
-            keys: instruction_data,
-            programId: programId,
-            data: new Uint8Array([2])
-      });
-      transaction.add(instruction)
-  });
- 
-  transaction.feePayer = wallet.publicKey
-  transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash
-
-  let signed = await wallet.signTransaction(transaction)
-  await broadcastSignedTransaction(signed)
 }
 
