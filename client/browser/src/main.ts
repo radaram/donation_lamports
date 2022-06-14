@@ -15,7 +15,7 @@ import { deserialize, serialize } from "borsh";
 const cluster = "http://localhost:8899";
 const connection = new Connection(cluster, "confirmed");
 const programId = new PublicKey(
-    "JBmwggDD23W6moHJcSjKTFWr7afTNgCbkfUpqrQH4Mvo"
+    "FBfmBnS8qGQ3oR3AnNg8kCxRM3mTA38DiQVdsTzhBvP5"
 );
 const wallet = new Wallet("https://www.sollet.io", cluster);
 
@@ -150,7 +150,6 @@ async function donate(userPubKey: PublicKey, amount: string) {
     tx.recentBlockhash = (await connection.getRecentBlockhash()).blockhash
  
     console.log("start transaction")
-    //
     let signed = await wallet.signTransaction(tx);
     await broadcastSignedTransaction(signed);
 }
@@ -163,9 +162,6 @@ async function withdraw() {
          
   let transaction = new Transaction()
   donations.forEach((item) => {
-      console.log(item)
-      console.log(programId)
-         
       let withdrawData = new WithdrawData({
           timestamp: item.timestamp
       });

@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh:: BorshSerialize;
 
 use std::str::FromStr;
 use std::mem;
@@ -7,12 +7,12 @@ use solana_program::{
     account_info::{next_account_info, AccountInfo},
     borsh::try_from_slice_unchecked,
     entrypoint::ProgramResult,
-    msg,
     program::invoke_signed,
     program_error::ProgramError,
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
     system_instruction,
+    msg,
 };
 
 
@@ -49,25 +49,24 @@ impl Processor {
     ) -> ProgramResult {
 
         let account_iter = &mut accounts.iter();
-    //    let donator_program_account = next_account_info(account_iter)?;
         
-        let payer_account = next_account_info(account_iter)?;
+        let donator_account = next_account_info(account_iter)?;
         let pda_account = next_account_info(account_iter)?;
         let system_program = next_account_info(account_iter)?;
 
-        if !payer_account.is_signer {
-            msg!("payer_account should be signer");
+        if !donator_account.is_signer {
+            msg!("donator_account should be signer");
             return Err(ProgramError::IncorrectProgramId);
         }
 
         if amount <= 0 {
-            msg!("This account is already initialised. skipping");
-            return Ok(())
+            msg!("Invalid amount");
+            return Err(ProgramError::InsufficientFunds);
         }
 
         let (pda, bump_seed) = Pubkey::find_program_address(
             &[
-                &payer_account.key.as_ref(), 
+                &donator_account.key.as_ref(), 
                 timestamp.to_string().as_ref()
             ], 
             program_id
@@ -85,7 +84,7 @@ impl Processor {
         msg!("Rent lamports: {}", rent_lamports);
 
         let ix = &system_instruction::create_account(
-            payer_account.key, 
+            donator_account.key, 
             pda_account.key, 
             rent_lamports, 
             space.try_into().unwrap(), 
@@ -95,12 +94,12 @@ impl Processor {
         invoke_signed(
             &ix,
             &[
-                payer_account.clone(), 
+                donator_account.clone(), 
                 pda_account.clone(), 
                 system_program.clone()
             ],
             &[&[
-                &payer_account.key.as_ref(), 
+                &donator_account.key.as_ref(), 
                 timestamp.to_string().as_ref(), 
                 &[bump_seed]
             ]]
@@ -108,17 +107,17 @@ impl Processor {
 
         invoke_signed(
             &system_instruction::transfer(
-                &payer_account.key,
+                &donator_account.key,
                 &pda_account.key,
                 amount,
             ),
             &[
-                payer_account.clone(),
+                donator_account.clone(),
                 pda_account.clone(),
                 system_program.clone(),
             ],
             &[&[
-                &payer_account.key.as_ref(), 
+                &donator_account.key.as_ref(), 
                 timestamp.to_string().as_ref(), 
                 &[bump_seed]
             ]],
@@ -130,7 +129,7 @@ impl Processor {
         donate_details.timestamp = timestamp;
 
         donate_details.serialize(&mut &mut pda_account.try_borrow_mut_data()?[..])?;
-        msg!("transfer {} lamports from {:?} to {:?}: done", amount, payer_account.key, pda_account.key);
+        msg!("transfer {} lamports from {:?} to {:?}: done", amount, donator_account.key, pda_account.key);
         msg!("bump {}, timestamp {}", bump_seed, timestamp); 
         Ok(())
     }
@@ -140,14 +139,15 @@ impl Processor {
         accounts: &[AccountInfo],
         timestamp: u64,
     ) -> ProgramResult {
+        let owner_key = "3mzC56NqGSrZZSTRkY2ya4zNcYkZjY6Pg2F47qrJ9ECd";
+
         let accounts_iter = &mut accounts.iter();
 
         let admin_account = next_account_info(accounts_iter)?;
         let pda_account = next_account_info(accounts_iter)?;
-        let user_account = next_account_info(accounts_iter)?;
-        let system_program = next_account_info(accounts_iter)?;
+        // let user_account = next_account_info(accounts_iter)?;
+        // let system_program = next_account_info(accounts_iter)?;
  
-        let owner_key = "3mzC56NqGSrZZSTRkY2ya4zNcYkZjY6Pg2F47qrJ9ECd";
         let owner_pubkey = Pubkey::from_str(owner_key).unwrap();
 
         if admin_account.key != &owner_pubkey {
@@ -159,23 +159,17 @@ impl Processor {
             return Err(ProgramError::IncorrectProgramId);
         }
 
-        let amount = **pda_account.lamports.borrow();
-
-        let (_, bump_seed) = Pubkey::find_program_address(
-            &[
-                &user_account.key.as_ref(), 
-                timestamp.to_string().as_ref()
-            ], 
-            program_id
-        );
-
-        
-        msg!("bump {}, timestamp {}", bump_seed, timestamp);
-        msg!("transfer {} lamports from {:?} to {:?}: done", amount, pda_account.key, admin_account.key);
-        msg!("user_account {}", user_account.key);
- 
+        let amount = **pda_account.lamports.borrow(); 
         if amount != 0 {
             /*
+             let (_, bump_seed) = Pubkey::find_program_address(
+                &[
+                    &user_account.key.as_ref(), 
+                    timestamp.to_string().as_ref()
+                ], 
+                program_id
+            );
+
             invoke_signed(
                 &system_instruction::transfer(
                     &pda_account.key, 

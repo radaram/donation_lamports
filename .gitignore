@@ -3,7 +3,5 @@ dist/
 node_modules/
 .cache/
 test-ledger/
-Cargo.lock
-yarn.lock
 keypair.json
 
