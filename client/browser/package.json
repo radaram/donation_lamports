@@ -8,11 +8,12 @@
     "prettier": "prettier --write src"
   },
   "keywords": [],
-  "author": "Max Block",
+  "author": "Radaram",
   "license": "ISC",
   "dependencies": {
-    "@project-serum/sol-wallet-adapter": "^0.2.0",
-    "@solana/web3.js": "^1.14.0",
+    "@project-serum/borsh": "^0.2.5",
+    "@project-serum/sol-wallet-adapter": "^0.2.6",
+    "@solana/web3.js": "^1.2.0",
     "borsh": "^0.6.0",
     "buffer-layout": "^1.2.2"
   },

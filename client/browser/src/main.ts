@@ -8,19 +8,18 @@ import {
     Keypair,
     sendAndConfirmTransaction
 } from "@solana/web3.js";
+
 import { deserialize, serialize } from "borsh";
 
 //const cluster = "https://api.devnet.solana.com";
 const cluster = "http://localhost:8899";
 const connection = new Connection(cluster, "confirmed");
 const programId = new PublicKey(
-    "A7tb6TTYrjaSxYmL2PaETaFkEHq8jDAyGyJWLjdPTkyoal"
+    "JBmwggDD23W6moHJcSjKTFWr7afTNgCbkfUpqrQH4Mvo"
 );
 const wallet = new Wallet("https://www.sollet.io", cluster);
 
 wallet.on("connect", (publicKey) => console.log("sollet connected", publicKey.toBase58()))
-
-let organizationPubkey;
 
 
 export async function onDonate() {
@@ -45,16 +44,17 @@ export async function onGetAllDonations() {
    if (!wallet.connected) {
         await wallet.connect()
     }
- 
-    let donations = await getAllDonations()
-    let donationsElem = document.getElementById("donations")
-    donationsElem.innerHTML = ""
-    donationsElem.innerHTML += "<ul>"
+    
+    let userWallet = document.getElementById("wallet").value;
+    let donations = await getAllDonations(userWallet);
+    let donationsElem = document.getElementById("all-donations");
+    donationsElem.innerHTML = "";
+    donationsElem.innerHTML += "<ul>";
     donations.forEach((item) => {
-        donationsElem.innerHTML += "<li>" + item.userPubKey.toString() + " " + item.amount + "</li>"    
+        donationsElem.innerHTML += "<li>" + item.userPubKey.toString() + " " + item.amount + "</li>";
     })
 
-    donationsElem.innerHTML += "</ul>"
+    donationsElem.innerHTML += "</ul>";
 }
 
 
@@ -82,7 +82,6 @@ class DonateDetails {
                 ["timestamp", "u64"],
             ]
         }]]);
-
 }
 
 
@@ -102,19 +101,20 @@ class WithdrawData {
 }
 
 
-async function donate(userPubKey, amount) {
+async function donate(userPubKey: PublicKey, amount: string) {
     console.log("donate called")     
     let timestamp = (Math.floor(Date.now() / 1000)).toString()
-    let donateDetails = new DonateDetails({
+    console.log("amount", amount)
+     
+   let donateDetails = new DonateDetails({
         user: wallet.publicKey.toBuffer(),
         amount: amount, 
         timestamp: timestamp,
     });
-    console.log(donateDetails);
     let data = serialize(DonateDetails.schema, donateDetails);
-    let dataToSend = new Uint8Array([1, ...data]);
+    let payload = new Uint8Array([1, ...data]);
 
-    let [pda, bump] = await PublicKey.findProgramAddress(
+    let [pda, _] = await PublicKey.findProgramAddress(
         [
             wallet.publicKey.toBuffer(), 
             timestamp
@@ -141,7 +141,7 @@ async function donate(userPubKey, amount) {
           },
         ],
         programId: programId,
-        data: Buffer.from(dataToSend),
+        data: Buffer.from(payload),
     });
 
     const tx = new Transaction();
@@ -165,11 +165,12 @@ async function withdraw() {
   donations.forEach((item) => {
       console.log(item)
       console.log(programId)
+         
       let withdrawData = new WithdrawData({
           timestamp: item.timestamp
       });
       let data = serialize(WithdrawData.schema, withdrawData);
-      let dataToSend = new Uint8Array([2, ...data]);
+      let payload = new Uint8Array([2, ...data]);
 
       let instruction_data = []
       instruction_data.push({ pubkey: wallet.publicKey, isSigner: true, isWritable: true  })  
@@ -180,7 +181,7 @@ async function withdraw() {
       let instruction = new TransactionInstruction({
             keys: instruction_data,
             programId: programId,
-            data: Buffer.from(dataToSend),
+            data: Buffer.from(payload),
       });
       transaction.add(instruction)
   });
@@ -201,20 +202,22 @@ async function broadcastSignedTransaction(signed) {
 }
 
 
-async function getAllDonations() {
+async function getAllDonations(userWallet) {
     let accounts = await connection.getProgramAccounts(programId);
     let result = [];
-    let donate_details;
+    console.log(accounts);
     accounts.forEach((item) => {
         try {
-            donate_details = deserialize(DonateDetails.schema, DonateDetails, item.account.data);
-            console.log(donate_details)
-            result.push({
-                pdaPubKey: item.pubkey,
-                userPubKey: new PublicKey(donate_details.user),
-                amount: donate_details.amount.toNumber(),
-                timestamp: donate_details.timestamp,
-            });
+            let donateDetails = deserialize(DonateDetails.schema, DonateDetails, item.account.data);
+            let userPubKey = new PublicKey(donateDetails.user);
+            if (!userWallet || (userWallet && userWallet == userPubKey.toString())) {
+                result.push({
+                    pdaPubKey: item.pubkey,
+                    userPubKey: userPubKey,
+                    amount: donateDetails.amount.toNumber(),
+                    timestamp: donateDetails.timestamp,
+                });
+            }
         } catch (err) {
             console.log(err);
         }

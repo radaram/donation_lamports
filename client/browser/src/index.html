@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
     />
-    <title>Document</title>
+    <title>Donations</title>
   </head>
   <body>
-    <script src="main.js"></script>
+    <script src="main.ts"></script>
 
     <h2>Sollet</h2>
     <div>
@@ -18,13 +18,14 @@
     </div>
     <br>
     <div>
-        <button onclick="main.onWithdraw()">withdraw</button>
+        <input id="wallet" type="text"></input>
+        <button onclick="main.onGetAllDonations()">All donations</button>
+        <br>
+        <div id="all-donations"></div>
     </div>
     <br>
     <div>
-        <button onclick="main.onGetAllDonations()">All donations</button>
-        <br>
-        <div id="donations"></div>
+        <button onclick="main.onWithdraw()">withdraw</button>
     </div>
   </body>
 </html>
