@@ -2,6 +2,5 @@
 
 Program is running in https://api.devnet.solana.com
 
-Program Id: 69LmiErZkiGqbtwfUTPFbohgjhGuJ1DJsaVaLmkhQHey
+Program Id: FBfmBnS8qGQ3oR3AnNg8kCxRM3mTA38DiQVdsTzhBvP5
 
-Example of donation: https://explorer.solana.com/tx/4MrWsXUomxpQNpCLDB6ULpFp8Vdwq8H1eBWCAYr7bpjRpHWh6WsnhsuGVz9y3oxakPEJZByBqgwcYZAThKiNcwaG?cluster=devnet
