@@ -6,24 +6,12 @@ use solana_program::{
 };
 
 
-
 pub enum DonateInstruction {
 
-    /// Accounts expected:
-    /// 
-    /// 0. `[signer]` User account who is creating the blog
-    /// 1. `[writable]` Blog account derived from PDA
-    /// 2. `[]` The System Program
     Withdraw {
         timestamp: u64,
     },
 
-    /// Accounts expected:
-    /// 
-    /// 0. `[signer]` User account who is creating the post
-    /// 1. `[writable]` Blog account for which post is being created
-    /// 2. `[writable]` Post account derived from PDA
-    /// 3. `[]` System Program
     Donate {
         user: Pubkey,
         amount: u64,

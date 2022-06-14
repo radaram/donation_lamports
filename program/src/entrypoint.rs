@@ -1,4 +1,3 @@
-use crate::processor::Processor;
 use solana_program::{
     account_info::AccountInfo, 
     entrypoint::ProgramResult, 
@@ -9,6 +8,8 @@ use solana_program::{
 use solana_program::entrypoint;
 #[cfg(not(feature = "no-entrypoint"))]
 entrypoint!(process_instruction);
+
+use crate::processor::Processor;
 
 
 fn process_instruction(
